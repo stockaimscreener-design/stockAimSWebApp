@@ -1,9 +1,12 @@
+// ==========================================
+// FILE: frontend/app/screener/page.tsx (WITH DEBUG INFO)
+// ==========================================
 'use client'
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { ScreenerFilters, ScreenerComparison, ScreenerOptions } from '@/lib/supabase'
-import { MarketData, ScreenerResult } from '@/types'
+import { ScreenerResult } from '@/types'
 import ScreenerForm from '@/components/ScreenerForm'
 import ScreenerResults from '@/components/ScreenerResults'
 import LoadingSpinner from '@/components/LoadingSpinner'
@@ -22,27 +25,41 @@ export default function ScreenerPage() {
       setLoading(true)
       setError(null)
 
+      console.log('🔍 Starting screener...')
+      console.log('Filters:', filters)
+      console.log('Options:', options)
+
+      const requestBody = {
+        filters,
+        comparisons,
+        options
+      }
+
+      console.log('📤 Sending request to /api/screener')
+
       const response = await fetch('/api/screener', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          filters,
-          comparisons,
-          options
-        }),
+        body: JSON.stringify(requestBody),
       })
 
+      console.log('📥 Response status:', response.status)
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('❌ Screener error:', errorData)
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
       }
 
       const data: ScreenerResult = await response.json()
+      console.log('✅ Screener results:', data)
       setResults(data)
-    } catch (err) {
-      console.error('Screening error:', err)
-      setError(err instanceof Error ? err.message : 'Screening failed')
+      
+    } catch (err: any) {
+      console.error('❌ Screening error:', err)
+      setError(err.message || 'Screening failed')
     } finally {
       setLoading(false)
     }
@@ -117,10 +134,13 @@ export default function ScreenerPage() {
                     </svg>
                     <div>
                       <h3 className="text-sm font-medium text-red-800">
-                        Error
+                        Screener Error
                       </h3>
                       <p className="text-sm text-red-700 mt-1">
                         {error}
+                      </p>
+                      <p className="text-xs text-red-600 mt-2">
+                        Check browser console for more details
                       </p>
                     </div>
                   </div>
@@ -166,4 +186,3 @@ export default function ScreenerPage() {
     </div>
   )
 }
-

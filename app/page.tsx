@@ -1,8 +1,11 @@
+// ==========================================
+// FILE: frontend/app/page.tsx (WITH DEBUG INFO)
+// ==========================================
 'use client'
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { supabase, Stock } from '@/lib/supabase'
+import { supabase } from '@/lib/api'
 import { TopStock, MarketSummary } from '@/types'
 import SearchBar from '@/components/SearchBar'
 import MarketOverview from '@/components/MarketOverview'
@@ -26,7 +29,11 @@ export default function Dashboard() {
       setLoading(true)
       setError(null)
 
-      // Fetch top 50 NASDAQ stocks by volume
+      console.log('🔍 Fetching dashboard data...')
+      console.log('Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
+      console.log('Supabase Key exists:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
+
+      // Fetch top 50 stocks by volume
       const { data: stocks, error: stocksError } = await supabase
         .from('stocks')
         .select('*')
@@ -35,18 +42,34 @@ export default function Dashboard() {
         .order('volume', { ascending: false })
         .limit(50)
 
-      if (stocksError) throw stocksError
+      console.log('📊 Supabase response:', { 
+        dataCount: stocks?.length, 
+        error: stocksError?.message 
+      })
+
+      if (stocksError) {
+        console.error('❌ Supabase error:', stocksError)
+        throw new Error(`Database error: ${stocksError.message}`)
+      }
+
+      if (!stocks || stocks.length === 0) {
+        console.warn('⚠️ No stocks found in database')
+        setError('No stocks found in database. Please run the update-stocks function first.')
+        setLoading(false)
+        return
+      }
 
       // Transform data for display
-      const transformedStocks: TopStock[] = stocks?.map(stock => ({
+      const transformedStocks: TopStock[] = stocks.map(stock => ({
         symbol: stock.symbol,
         name: stock.name || stock.symbol,
         price: stock.price || 0,
         change_percent: stock.change_percent || 0,
         volume: stock.volume || 0,
         market_cap: stock.market_cap
-      })) || []
+      }))
 
+      console.log('✅ Successfully loaded', transformedStocks.length, 'stocks')
       setTopStocks(transformedStocks)
 
       // Mock market summary (in real app, fetch from API)
@@ -63,9 +86,9 @@ export default function Dashboard() {
         }
       })
 
-    } catch (err) {
-      console.error('Error fetching dashboard data:', err)
-      setError('Failed to load dashboard data')
+    } catch (err: any) {
+      console.error('❌ Dashboard error:', err)
+      setError(err.message || 'Failed to load dashboard data')
     } finally {
       setLoading(false)
     }
@@ -93,7 +116,6 @@ export default function Dashboard() {
 
   const handleSearch = async (query: string) => {
     if (!query.trim()) {
-      // If empty query, go back to top stocks
       setIsSearchMode(false)
       setSearchQuery('')
       fetchDashboardData()
@@ -106,6 +128,8 @@ export default function Dashboard() {
       setIsSearchMode(true)
       setSearchQuery(query)
       
+      console.log('🔍 Searching for:', query)
+
       // Search in both stocks and stock_tickers tables
       const [stocksResult, tickersResult] = await Promise.all([
         supabase
@@ -124,7 +148,6 @@ export default function Dashboard() {
       if (stocksResult.error) throw stocksResult.error
       if (tickersResult.error) throw tickersResult.error
 
-      // Combine results from both tables
       const searchResults: TopStock[] = []
       
       // Add stocks with price data
@@ -139,58 +162,19 @@ export default function Dashboard() {
         })
       })
 
-      // Add/enrich tickers that don't have price data yet via local /api/quote fallback
-      const missing = (tickersResult.data || []).filter(t => !searchResults.find(s => s.symbol === t.Symbol))
-      if (missing.length > 0) {
-        const enriched: TopStock[] = []
-        for (const t of missing) {
-          try {
-            const resp = await fetch(`/api/quote?symbol=${encodeURIComponent(t.Symbol)}`)
-            if (resp.ok) {
-              const { quote } = await resp.json()
-              enriched.push({
-                symbol: quote.symbol,
-                name: quote.name || t['Company Name'] || t.Symbol,
-                price: quote.price || 0,
-                change_percent: quote.change_percent || 0,
-                volume: quote.volume || 0,
-                market_cap: quote.market_cap || null,
-              })
-            } else {
-              enriched.push({
-                symbol: t.Symbol,
-                name: t['Company Name'] || t.Symbol,
-                price: 0,
-                change_percent: 0,
-                volume: 0,
-                market_cap: null,
-              })
-            }
-          } catch {
-            enriched.push({
-              symbol: t.Symbol,
-              name: t['Company Name'] || t.Symbol,
-              price: 0,
-              change_percent: 0,
-              volume: 0,
-              market_cap: null,
-            })
-          }
-        }
-        searchResults.push(...enriched)
-      }
-
+      console.log('✅ Search results:', searchResults.length)
       setTopStocks(searchResults)
-    } catch (err) {
-      console.error('Search error:', err)
-      setError('Search failed')
+      
+    } catch (err: any) {
+      console.error('❌ Search error:', err)
+      setError(`Search failed: ${err.message}`)
     } finally {
       setLoading(false)
     }
   }
 
   if (loading && topStocks.length === 0) {
-    return <LoadingSpinner />
+    return <LoadingSpinner text="Loading stocks..." />
   }
 
   return (
@@ -233,7 +217,21 @@ export default function Dashboard() {
             animate={{ opacity: 1, y: 0 }}
             className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6"
           >
-            {error}
+            <div className="flex items-center">
+              <svg className="h-5 w-5 text-red-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <p className="font-medium">Error</p>
+                <p className="text-sm">{error}</p>
+                <button 
+                  onClick={fetchDashboardData}
+                  className="mt-2 text-sm underline hover:no-underline"
+                >
+                  Try Again
+                </button>
+              </div>
+            </div>
           </motion.div>
         )}
 
@@ -268,17 +266,6 @@ export default function Dashboard() {
               >
                 {loading ? 'Refreshing...' : 'Refresh'}
               </button>
-              <button
-                onClick={() => {
-                  // Export functionality will be handled by TopStocksTable
-                  const event = new CustomEvent('exportCSV')
-                  window.dispatchEvent(event)
-                }}
-                className="btn-primary text-sm"
-                disabled={topStocks.length === 0}
-              >
-                Export CSV
-              </button>
             </div>
           </div>
 
@@ -288,131 +275,11 @@ export default function Dashboard() {
           />
         </motion.div>
 
-        {/* Market Sections */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6"
-        >
-          {/* Top Gainers */}
-          <div className="card">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Top Gainers</h3>
-              <button
-                onClick={() => {
-                  const topGainers = [...topStocks]
-                    .filter(stock => stock.change_percent > 0)
-                    .sort((a, b) => b.change_percent - a.change_percent)
-                  setTopStocks(topGainers)
-                  setIsSearchMode(true)
-                  setSearchQuery('Top Gainers')
-                }}
-                className="btn-secondary text-sm"
-              >
-                View All
-              </button>
-            </div>
-            <div className="space-y-2">
-              {topStocks
-                .filter(stock => stock.change_percent > 0)
-                .sort((a, b) => b.change_percent - a.change_percent)
-                .slice(0, 5)
-                .map((stock, index) => (
-                  <div key={stock.symbol} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                    <div>
-                      <div className="font-medium text-sm">{stock.symbol}</div>
-                      <div className="text-xs text-gray-500">{stock.name}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-medium text-success">+{stock.change_percent.toFixed(2)}%</div>
-                      <div className="text-xs text-gray-500">{formatPrice(stock.price)}</div>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-
-          {/* Top Losers */}
-          <div className="card">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Top Losers</h3>
-              <button
-                onClick={() => {
-                  const topLosers = [...topStocks]
-                    .filter(stock => stock.change_percent < 0)
-                    .sort((a, b) => a.change_percent - b.change_percent)
-                  setTopStocks(topLosers)
-                  setIsSearchMode(true)
-                  setSearchQuery('Top Losers')
-                }}
-                className="btn-secondary text-sm"
-              >
-                View All
-              </button>
-            </div>
-            <div className="space-y-2">
-              {topStocks
-                .filter(stock => stock.change_percent < 0)
-                .sort((a, b) => a.change_percent - b.change_percent)
-                .slice(0, 5)
-                .map((stock, index) => (
-                  <div key={stock.symbol} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                    <div>
-                      <div className="font-medium text-sm">{stock.symbol}</div>
-                      <div className="text-xs text-gray-500">{stock.name}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-medium text-danger">{stock.change_percent.toFixed(2)}%</div>
-                      <div className="text-xs text-gray-500">{formatPrice(stock.price)}</div>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-
-          {/* Unusual Volume */}
-          <div className="card">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Unusual Volume</h3>
-              <button
-                onClick={() => {
-                  const unusualVolume = [...topStocks]
-                    .sort((a, b) => b.volume - a.volume)
-                  setTopStocks(unusualVolume)
-                  setIsSearchMode(true)
-                  setSearchQuery('Unusual Volume')
-                }}
-                className="btn-secondary text-sm"
-              >
-                View All
-              </button>
-            </div>
-            <div className="space-y-2">
-              {topStocks
-                .sort((a, b) => b.volume - a.volume)
-                .slice(0, 5)
-                .map((stock, index) => (
-                  <div key={stock.symbol} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                    <div>
-                      <div className="font-medium text-sm">{stock.symbol}</div>
-                      <div className="text-xs text-gray-500">{stock.name}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-medium text-gray-900">{formatVolume(stock.volume)}</div>
-                      <div className="text-xs text-gray-500">{formatPrice(stock.price)}</div>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-        </motion.div>
-
         {/* Quick Actions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.6 }}
+          transition={{ duration: 0.6, delay: 0.4 }}
           className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6"
         >
           <div className="card text-center">
@@ -449,4 +316,3 @@ export default function Dashboard() {
     </div>
   )
 }
-
