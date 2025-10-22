@@ -1,4 +1,4 @@
 {
-  "/screener/page": "app/screener/page.js",
+  "/not-found": "app/not-found.js",
   "/page": "app/page.js"
 }
