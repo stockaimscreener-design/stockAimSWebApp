@@ -2,6 +2,7 @@
 // FILE: frontend/app/page.tsx (WITH DEBUG INFO)
 // ==========================================
 'use client'
+export const dynamic = 'force-dynamic'; //
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
