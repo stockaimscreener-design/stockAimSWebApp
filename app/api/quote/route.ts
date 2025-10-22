@@ -4,7 +4,10 @@ import { config } from '@/lib/config';
 
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
+        // Use the standard URL API to avoid nextUrl static-analysis issues
+    const url = new URL(request.url);
+    const searchParams = url.searchParams;
+    //const searchParams = request.nextUrl.searchParams;
     const symbols = searchParams.get('symbols') || searchParams.get('symbol');
 
     if (!symbols) {
