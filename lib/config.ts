@@ -6,11 +6,27 @@
  * With safe fallbacks to prevent build errors
  */
 
-const getEnvVar = (key: string, fallback: string = ''): string => {
+// const getEnvVar = (key: string, fallback: string = ''): string => {
+//   if (typeof window !== 'undefined') {
+//     return (window as any).ENV?.[key] || process.env[key] || fallback;
+//   }
+//   return process.env[key] || fallback;
+// };
+
+// Safe environment variable accessor for both client & server
+const getEnvVar = (key: string, fallback = ''): string => {
+  // If running in the browser
   if (typeof window !== 'undefined') {
-    return (window as any).ENV?.[key] || process.env[key] || fallback;
+    const clientKey = key.startsWith('NEXT_PUBLIC_') ? key : `NEXT_PUBLIC_${key}`;
+    return process.env[clientKey] || fallback;
   }
-  return process.env[key] || fallback;
+
+  // If running on the server (or during build)
+  return (
+    process.env[key] ||
+    process.env[`NEXT_PUBLIC_${key}`] ||
+    fallback
+  );
 };
 
 export const config = {
