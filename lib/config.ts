@@ -31,10 +31,11 @@ export const config = {
 } as const;
 
 export function isConfigValid(): boolean {
-  const hasUrl = config.supabase.url && config.supabase.url.startsWith('http');
-  const hasKey = config.supabase.anonKey && config.supabase.anonKey.length > 20;
+  const hasUrl = !!(config.supabase.url && config.supabase.url.startsWith('http'));
+  const hasKey = !!(config.supabase.anonKey && config.supabase.anonKey.length > 20);
   return hasUrl && hasKey;
 }
+
 
 export function validateConfig() {
   console.log('🔍 Config validation:');
