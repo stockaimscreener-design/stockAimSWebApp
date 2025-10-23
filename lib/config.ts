@@ -1,44 +1,20 @@
 // ==========================================
-// FILE 2: lib/config.ts (REPLACE ENTIRE FILE)
+// FILE: lib/config.ts (SIMPLIFIED - NO FALLBACKS IN CLIENT)
 // ==========================================
 /**
  * Centralized configuration for all API endpoints
- * With safe fallbacks to prevent build errors
  */
 
-// const getEnvVar = (key: string, fallback: string = ''): string => {
-//   if (typeof window !== 'undefined') {
-//     return (window as any).ENV?.[key] || process.env[key] || fallback;
-//   }
-//   return process.env[key] || fallback;
-// };
-
-// Safe environment variable accessor for both client & server
-const getEnvVar = (key: string, fallback = ''): string => {
-  // If running in the browser
-  if (typeof window !== 'undefined') {
-    const clientKey = key.startsWith('NEXT_PUBLIC_') ? key : `NEXT_PUBLIC_${key}`;
-    return process.env[clientKey] || fallback;
-  }
-
-  // If running on the server (or during build)
-  return (
-    process.env[key] ||
-    process.env[`NEXT_PUBLIC_${key}`] ||
-    fallback
-  );
-};
-
 export const config = {
-  // Supabase
+  // Supabase - Use direct process.env access, no fallbacks
   supabase: {
-    url: getEnvVar('NEXT_PUBLIC_SUPABASE_URL', 'https://placeholder.supabase.co'),
-    anonKey: getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'placeholder-key'),
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    anonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
   },
   
-  // Stock API (Your Vercel Python API)
+  // Stock API
   stockApi: {
-    baseUrl: getEnvVar('NEXT_PUBLIC_STOCK_API_URL', 'https://stock-api-x35p.vercel.app'),
+    baseUrl: process.env.NEXT_PUBLIC_STOCK_API_URL || 'https://stock-api-x35p.vercel.app',
     endpoints: {
       quote: '/quote',
       health: '/health',
@@ -47,32 +23,32 @@ export const config = {
   
   // Supabase Edge Functions
   functions: {
-    updateStocks: getEnvVar('NEXT_PUBLIC_UPDATE_STOCKS_URL') ||
-                  `${getEnvVar('NEXT_PUBLIC_SUPABASE_URL', 'https://placeholder.supabase.co')}/functions/v1/update-stocks`,
-    screener: getEnvVar('NEXT_PUBLIC_SCREENER_URL') ||
-              `${getEnvVar('NEXT_PUBLIC_SUPABASE_URL', 'https://placeholder.supabase.co')}/functions/v1/screener`,
+    updateStocks: process.env.NEXT_PUBLIC_UPDATE_STOCKS_URL ||
+                  `${process.env.NEXT_PUBLIC_SUPABASE_URL || ''}/functions/v1/update-stocks`,
+    screener: process.env.NEXT_PUBLIC_SCREENER_URL ||
+              `${process.env.NEXT_PUBLIC_SUPABASE_URL || ''}/functions/v1/screener`,
   },
 } as const;
 
 export function isConfigValid(): boolean {
-  return config.supabase.url !== 'https://placeholder.supabase.co' &&
-         config.supabase.anonKey !== 'placeholder-key';
+  const hasUrl = config.supabase.url && config.supabase.url.startsWith('http');
+  const hasKey = config.supabase.anonKey && config.supabase.anonKey.length > 20;
+  return hasUrl && hasKey;
 }
 
 export function validateConfig() {
-  const required = [
-    'NEXT_PUBLIC_SUPABASE_URL',
-    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-  ];
+  console.log('🔍 Config validation:');
+  console.log('NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
+  console.log('NEXT_PUBLIC_SUPABASE_ANON_KEY exists:', !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  console.log('config.supabase.url:', config.supabase.url);
+  console.log('config.supabase.anonKey exists:', !!config.supabase.anonKey);
+  console.log('isConfigValid():', isConfigValid());
   
-  const missing = required.filter(key => !process.env[key]);
-  
-  if (missing.length > 0 && process.env.NODE_ENV !== 'production') {
-    console.warn(
-      `⚠️ Missing environment variables: ${missing.join(', ')}\n` +
-      'Please check your .env.local file'
+  if (!isConfigValid()) {
+    throw new Error(
+      'Invalid Supabase configuration. Please check environment variables.'
     );
   }
   
-  return missing.length === 0;
+  return true;
 }

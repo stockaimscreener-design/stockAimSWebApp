@@ -1,5 +1,5 @@
 // ==========================================
-// FILE 3: lib/api.ts (REPLACE ENTIRE FILE)
+// FILE: lib/api.ts (FIX INITIALIZATION)
 // ==========================================
 import { createClient } from '@supabase/supabase-js'
 import { config, isConfigValid } from './config'
@@ -15,10 +15,27 @@ export type QuoteResult = {
   relative_volume: number | null
 }
 
-// Initialize Supabase client with config - safe initialization
-export const supabase = isConfigValid()
-  ? createClient(config.supabase.url, config.supabase.anonKey)
-  : createClient('https://placeholder.supabase.co', 'placeholder-key');
+// IMPORTANT: Initialize Supabase client ONLY if config is valid
+// This prevents using placeholder values
+function createSupabaseClient() {
+  console.log('🔧 Creating Supabase client...');
+  console.log('URL:', config.supabase.url);
+  console.log('Key exists:', !!config.supabase.anonKey);
+  console.log('Is valid:', isConfigValid());
+  
+  if (!isConfigValid()) {
+    console.error('❌ Invalid Supabase configuration!');
+    throw new Error(
+      'Supabase configuration is invalid. ' +
+      'Please check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY'
+    );
+  }
+  
+  return createClient(config.supabase.url, config.supabase.anonKey);
+}
+
+// Initialize client - will throw error if config is invalid
+export const supabase = createSupabaseClient();
 
 export type UpdateStocksResponse = {
   success: boolean
@@ -34,10 +51,6 @@ export type UpdateStocksResponse = {
  * Call Supabase Edge Function to update stock prices
  */
 export async function updateStocks(symbols: string[]): Promise<UpdateStocksResponse> {
-  if (!isConfigValid()) {
-    throw new Error('Supabase configuration is invalid. Please check environment variables.');
-  }
-  
   const url = config.functions.updateStocks;
   
   const res = await fetch(url, {
@@ -59,10 +72,6 @@ export async function updateStocks(symbols: string[]): Promise<UpdateStocksRespo
  * Fetch stocks from Supabase using ANON key (RLS enforced)
  */
 export async function fetchStocks(symbols: string[]): Promise<QuoteResult[]> {
-  if (!isConfigValid()) {
-    throw new Error('Supabase configuration is invalid. Please check environment variables.');
-  }
-  
   const { data, error } = await supabase
     .from('stocks')
     .select('*')
