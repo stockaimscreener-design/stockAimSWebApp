@@ -1,8 +1,11 @@
 // ==========================================
-// FILE: frontend/app/api/screener/route.ts (UPDATED)
+// FILE 5: app/api/screener/route.ts (REPLACE ENTIRE FILE)
 // ==========================================
 import { NextRequest, NextResponse } from 'next/server'
 import { config } from '@/lib/config'
+
+// Force dynamic rendering
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,6 +23,7 @@ export async function POST(request: NextRequest) {
         'Authorization': `Bearer ${config.supabase.anonKey}`,    
       },
       body: JSON.stringify(body),
+      cache: 'no-store'
     })
 
     console.log('Response status:', response.status)

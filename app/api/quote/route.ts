@@ -1,13 +1,17 @@
 // ==========================================
+// FILE 4: app/api/quote/route.ts (REPLACE ENTIRE FILE)
+// ==========================================
 import { NextRequest, NextResponse } from 'next/server';
 import { config } from '@/lib/config';
 
+// Force dynamic rendering to avoid static generation issues
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
-        // Use the standard URL API to avoid nextUrl static-analysis issues
+    // Use the standard URL API to avoid nextUrl static-analysis issues
     const url = new URL(request.url);
     const searchParams = url.searchParams;
-    //const searchParams = request.nextUrl.searchParams;
     const symbols = searchParams.get('symbols') || searchParams.get('symbol');
 
     if (!symbols) {
@@ -25,7 +29,7 @@ export async function GET(request: NextRequest) {
         'User-Agent': 'NextJS-App/1.0',
         'Accept': 'application/json',
       },
-      next: { revalidate: 60 }
+      cache: 'no-store' // Changed from next.revalidate to cache: 'no-store'
     });
 
     if (!response.ok) {

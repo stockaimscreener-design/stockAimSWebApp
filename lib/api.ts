@@ -1,5 +1,8 @@
+// ==========================================
+// FILE 3: lib/api.ts (REPLACE ENTIRE FILE)
+// ==========================================
 import { createClient } from '@supabase/supabase-js'
-import { config } from './config'
+import { config, isConfigValid } from './config'
 
 export type QuoteResult = {
   symbol: string
@@ -12,11 +15,10 @@ export type QuoteResult = {
   relative_volume: number | null
 }
 
-// Initialize Supabase client with config
-export const supabase = createClient(
-  config.supabase.url,
-  config.supabase.anonKey
-)
+// Initialize Supabase client with config - safe initialization
+export const supabase = isConfigValid()
+  ? createClient(config.supabase.url, config.supabase.anonKey)
+  : createClient('https://placeholder.supabase.co', 'placeholder-key');
 
 export type UpdateStocksResponse = {
   success: boolean
@@ -32,6 +34,10 @@ export type UpdateStocksResponse = {
  * Call Supabase Edge Function to update stock prices
  */
 export async function updateStocks(symbols: string[]): Promise<UpdateStocksResponse> {
+  if (!isConfigValid()) {
+    throw new Error('Supabase configuration is invalid. Please check environment variables.');
+  }
+  
   const url = config.functions.updateStocks;
   
   const res = await fetch(url, {
@@ -53,6 +59,10 @@ export async function updateStocks(symbols: string[]): Promise<UpdateStocksRespo
  * Fetch stocks from Supabase using ANON key (RLS enforced)
  */
 export async function fetchStocks(symbols: string[]): Promise<QuoteResult[]> {
+  if (!isConfigValid()) {
+    throw new Error('Supabase configuration is invalid. Please check environment variables.');
+  }
+  
   const { data, error } = await supabase
     .from('stocks')
     .select('*')
